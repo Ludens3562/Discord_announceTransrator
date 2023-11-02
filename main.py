@@ -30,7 +30,6 @@ async def on_message(message):
     if message.channel.id == target_channel_id:
         await translate_and_reply(message)
 
-
 async def translate_and_reply(message):
     try:
         if message.content:
