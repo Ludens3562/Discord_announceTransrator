@@ -2,3 +2,4 @@ discord==2.0.0
 discord.py==2.3.2
 googletrans==4.0.0rc1
 python-dotenv==1.0.0
+deepl==1.16.1
