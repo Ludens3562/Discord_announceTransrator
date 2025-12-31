@@ -71,13 +71,74 @@ class TranslatorBot:
                 print(f"DeepL初期化エラー: {e}")
     
     def clean_message_content(self, content):
-        """メッセージから絵文字や不要な要素を削除"""
-        # カスタム絵文字を削除 (<:name:id> や <a:name:id> 形式)
-        content = re.sub(r'<a?:[^:]+:\d+>', '', content)
+        """メッセージから不要な要素を削除"""
         # Unicode絵文字は保持
         # Discordメンションを保持
         # マークダウン記法を保持
+        # カスタム絵文字は保護（翻訳時に保持）
         return content.strip()
+    
+    def protect_markdown_formatting(self, content):
+        """マークダウン記法を保護用タグで囲む"""
+        placeholders = {}
+        counter = [0]  # リストを使用してクロージャ内で変更可能に
+        
+        def create_placeholder(match):
+            key = f"__PLACEHOLDER_{counter[0]}__"
+            placeholders[key] = match.group(0)
+            counter[0] += 1
+            return key
+        
+        # コードブロック (```...```)
+        content = re.sub(r'```[\s\S]*?```', create_placeholder, content)
+        
+        # インラインコード (`...`)
+        content = re.sub(r'`[^`]+`', create_placeholder, content)
+        
+        # リンク [text](url)
+        content = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', create_placeholder, content)
+        
+        # Discord メンション (<@123>, <@!123>, <#123>, <@&123>)
+        content = re.sub(r'<[@#][!&]?\d+>', create_placeholder, content)
+        
+        # タイムスタンプ (<t:1234567890:R> など)
+        content = re.sub(r'<t:\d+(?::[tTdDfFR])?>', create_placeholder, content)
+        
+        # カスタム絵文字を保護 (<:name:id> や <a:name:id> 形式)
+        content = re.sub(r'<a?:[^:]+:\d+>', create_placeholder, content)
+        
+        return content, placeholders
+    
+    def restore_markdown_formatting(self, content, placeholders):
+        """プレースホルダーを元のマークダウン記法に復元"""
+        for key, value in placeholders.items():
+            content = content.replace(key, value)
+        return content
+    
+    def translate_with_formatting(self, text):
+        """フォーマットを保持しながらテキストを翻訳"""
+        if not self.translator or not text:
+            return None
+        
+        try:
+            # マークダウン記法を保護
+            protected_text, placeholders = self.protect_markdown_formatting(text)
+            
+            # 翻訳を実行
+            result = self.translator.translate_text(
+                protected_text,
+                source_lang=self.config.get("source_lang", "EN"),
+                target_lang=self.config.get("target_lang", "JA"),
+                formality=self.config.get("formality", "more"),
+                tag_handling="xml"
+            )
+            
+            # プレースホルダーを復元
+            translated_text = self.restore_markdown_formatting(result.text, placeholders)
+            return translated_text
+        except Exception as e:
+            print(f"翻訳エラー: {e}")
+            return None
     
     async def translate_message(self, message):
         """メッセージを翻訳"""
@@ -89,16 +150,72 @@ class TranslatorBot:
             if not cleaned_content:
                 return None
             
-            result = self.translator.translate_text(
-                cleaned_content,
-                source_lang=self.config.get("source_lang", "EN"),
-                target_lang=self.config.get("target_lang", "JA"),
-                formality=self.config.get("formality", "more"),
-                tag_handling="xml"
-            )
-            return result.text
+            return self.translate_with_formatting(cleaned_content)
         except Exception as e:
             print(f"翻訳エラー: {e}")
+            return None
+    
+    async def translate_embed(self, embed):
+        """Embedを翻訳して新しいEmbedを返す"""
+        if not self.translator:
+            return None
+        
+        try:
+            # 新しいEmbedを作成
+            new_embed = discord.Embed(color=embed.color)
+            
+            # タイトルを翻訳
+            if embed.title:
+                new_embed.title = self.translate_with_formatting(embed.title)
+            
+            # 説明を翻訳
+            if embed.description:
+                new_embed.description = self.translate_with_formatting(embed.description)
+            
+            # URLをそのまま保持
+            if embed.url:
+                new_embed.url = embed.url
+            
+            # フィールドを翻訳
+            for field in embed.fields:
+                translated_name = self.translate_with_formatting(field.name) if field.name else field.name
+                translated_value = self.translate_with_formatting(field.value) if field.value else field.value
+                new_embed.add_field(
+                    name=translated_name or field.name,
+                    value=translated_value or field.value,
+                    inline=field.inline
+                )
+            
+            # フッターを翻訳
+            if embed.footer and embed.footer.text:
+                translated_footer = self.translate_with_formatting(embed.footer.text)
+                new_embed.set_footer(
+                    text=translated_footer or embed.footer.text,
+                    icon_url=embed.footer.icon_url
+                )
+            
+            # 著者情報を翻訳
+            if embed.author and embed.author.name:
+                translated_author = self.translate_with_formatting(embed.author.name)
+                new_embed.set_author(
+                    name=translated_author or embed.author.name,
+                    url=embed.author.url,
+                    icon_url=embed.author.icon_url
+                )
+            
+            # 画像とサムネイルをそのまま保持
+            if embed.image:
+                new_embed.set_image(url=embed.image.url)
+            if embed.thumbnail:
+                new_embed.set_thumbnail(url=embed.thumbnail.url)
+            
+            # タイムスタンプをそのまま保持
+            if embed.timestamp:
+                new_embed.timestamp = embed.timestamp
+            
+            return new_embed
+        except Exception as e:
+            print(f"Embed翻訳エラー: {e}")
             return None
 
 # BOTインスタンス
@@ -139,13 +256,34 @@ async def on_message(message):
 
 async def translate_and_reply(message):
     """メッセージを翻訳して返信"""
-    if not message.content.strip():
+    has_content = message.content.strip()
+    has_embeds = len(message.embeds) > 0
+    
+    if not has_content and not has_embeds:
         return
     
-    translation = await translator_bot.translate_message(message)
-    if translation:
+    # テキストコンテンツの翻訳
+    translation = None
+    if has_content:
+        translation = await translator_bot.translate_message(message)
+    
+    # Embedの翻訳
+    translated_embeds = []
+    if has_embeds:
+        for embed in message.embeds:
+            translated_embed = await translator_bot.translate_embed(embed)
+            if translated_embed:
+                translated_embeds.append(translated_embed)
+    
+    # 結果を送信
+    if translation or translated_embeds:
         try:
-            await message.reply(translation, mention_author=False)
+            if translation and translated_embeds:
+                await message.reply(translation, embeds=translated_embeds, mention_author=False)
+            elif translation:
+                await message.reply(translation, mention_author=False)
+            elif translated_embeds:
+                await message.reply(embeds=translated_embeds, mention_author=False)
         except Exception as e:
             print(f"返信エラー: {e}")
 
