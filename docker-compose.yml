@@ -1,0 +1,6 @@
+services:
+  disbot:
+    build: .
+    image: disbot:latest
+    container_name: disbot
+    restart: unless-stopped
