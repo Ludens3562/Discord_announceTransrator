@@ -10,8 +10,7 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Tokyo
-    # ソースを読み取り専用でマウント（開発時のみ変更してください）
-    volumes:
+    # ソースを読み取り専用でマウント（開発時�Eみ変更してください�E�E    volumes:
       - ./:/app:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]

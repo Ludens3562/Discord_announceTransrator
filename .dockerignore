@@ -20,3 +20,4 @@ htmlcov/
 node_modules/
 # Compose ã®ã‚ªãƒ¼ãƒãƒ¼ãƒ©ã‚¤ãƒ‰ã¯é™¤å¤–
 docker-compose.override.yml
+\n# ƒrƒ‹ƒhƒRƒ“ƒeƒLƒXƒgÅ“K‰»\ntests/\ndocs/\nwiki/\n.github/\nREADME.md\n.pytest_cache/
