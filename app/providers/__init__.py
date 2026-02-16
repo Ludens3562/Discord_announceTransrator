@@ -3,6 +3,6 @@
 ここでは公開 API を明示的にエクスポートする。
 """
 
-from .provider import Provider
+from .provider import Provider, ProviderError
 
-__all__ = ["Provider"]
+__all__ = ["Provider", "ProviderError"]
