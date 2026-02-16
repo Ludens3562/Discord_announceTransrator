@@ -33,23 +33,42 @@ class TranslatorBot:
         self.initialize_translator()
     
     def load_config(self):
-        """設定ファイルを読み込み（シークレット情報は除く）"""
+        """設定ファイルを読み込み（シークレット情報は除く）。
+
+        - 既存の設定ファイルを互換的に読み込み、必要なキー（プロバイダ設定等）を補完する。
+        """
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                cfg = json.load(f)
+                # 互換性のためのデフォルト補完
+                cfg.setdefault("source_lang", "EN")
+                cfg.setdefault("target_lang", "JA")
+                cfg.setdefault("formality", "more")
+                cfg.setdefault("default_provider", "deepl")
+                cfg.setdefault("guild_providers", {})
+                cfg.setdefault("channel_providers", {})
+                return cfg
         return {
             "source_lang": "EN",
             "target_lang": "JA",
-            "formality": "more"
+            "formality": "more",
+            "default_provider": "deepl",
+            "guild_providers": {},
+            "channel_providers": {}
         }
     
     def save_config(self):
-        """設定ファイルを保存（シークレット情報は除く）"""
-        # シークレット情報を除いた設定のみ保存
+        """設定ファイルを保存（シークレット情報は除く）。
+
+        - provider 設定やギルド/チャンネル上書き情報も保存する（互換維持）。
+        """
         config_to_save = {
             "source_lang": self.config.get("source_lang", "EN"),
             "target_lang": self.config.get("target_lang", "JA"),
-            "formality": self.config.get("formality", "more")
+            "formality": self.config.get("formality", "more"),
+            "default_provider": self.config.get("default_provider", "deepl"),
+            "guild_providers": self.config.get("guild_providers", {}),
+            "channel_providers": self.config.get("channel_providers", {})
         }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config_to_save, f, indent=2, ensure_ascii=False)
@@ -156,11 +175,26 @@ class TranslatorBot:
         # TranslationService が利用可能ならそちらを優先して利用する
         if getattr(self, "translation_service", None):
             try:
+                # Provider の決定（channel > guild > global の優先順位）
+                guild_id = str(message.guild.id) if message.guild else None
+                channel_id = str(message.channel.id)
+                provider_name = None
+
+                channel_providers = self.config.get("channel_providers", {})
+                guild_providers = self.config.get("guild_providers", {})
+
+                if channel_id and channel_id in channel_providers:
+                    provider_name = channel_providers[channel_id]
+                elif guild_id and guild_id in guild_providers:
+                    provider_name = guild_providers[guild_id]
+                else:
+                    provider_name = self.config.get("default_provider", "deepl")
+
                 return await self.translation_service.translate_text(
                     message.content,
                     source=self.config.get("source_lang", "EN"),
                     target=self.config.get("target_lang", "JA"),
-                    provider_name="deepl",
+                    provider_name=provider_name,
                 )
             except Exception as e:
                 # Provider 側のエラーが発生しても既存の同期的実装へフォールバックする
@@ -190,9 +224,8 @@ class TranslatorBot:
 # BOTインスタンス
 translator_bot = TranslatorBot()
 
-async def is_owner_check(interaction: discord.Interaction) -> bool:
-    """BOTオーナーかどうか確認"""
-    return await interaction.client.is_owner(interaction.user)
+# コマンドは専用モジュールに分割して登録する
+from app.commands import translate_commands  # コマンドを登録する
 
 @bot.event
 async def on_ready():
@@ -244,108 +277,6 @@ async def translate_and_reply(message):
             await message.reply(translation, mention_author=False)
         except Exception as e:
             print(f"返信エラー: {e}")
-
-# スラッシュコマンド定義
-@bot.tree.command(name="add_channel", description="監視チャンネルを追加")
-@discord.app_commands.check(is_owner_check)
-async def add_channel(interaction: discord.Interaction, channel: discord.TextChannel = None):
-    """監視チャンネルを追加"""
-    if channel is None:
-        channel = interaction.channel
-    
-    server_id = str(interaction.guild.id)
-    channel_id = str(channel.id)
-    
-    if server_id not in translator_bot.channels:
-        translator_bot.channels[server_id] = []
-    
-    if channel_id not in translator_bot.channels[server_id]:
-        translator_bot.channels[server_id].append(channel_id)
-        translator_bot.save_channels()
-        await interaction.response.send_message(f"チャンネル {channel.mention} を監視対象に追加しました。")
-    else:
-        await interaction.response.send_message(f"チャンネル {channel.mention} は既に監視対象です。")
-
-@bot.tree.command(name="remove_channel", description="監視チャンネルを削除")
-@discord.app_commands.check(is_owner_check)
-async def remove_channel(interaction: discord.Interaction, channel: discord.TextChannel = None):
-    """監視チャンネルを削除"""
-    if channel is None:
-        channel = interaction.channel
-    
-    server_id = str(interaction.guild.id)
-    channel_id = str(channel.id)
-    
-    if server_id in translator_bot.channels and channel_id in translator_bot.channels[server_id]:
-        translator_bot.channels[server_id].remove(channel_id)
-        if not translator_bot.channels[server_id]:
-            del translator_bot.channels[server_id]
-        translator_bot.save_channels()
-        await interaction.response.send_message(f"チャンネル {channel.mention} を監視対象から削除しました。")
-    else:
-        await interaction.response.send_message(f"チャンネル {channel.mention} は監視対象ではありません。")
-
-@bot.tree.command(name="list_channels", description="監視チャンネル一覧を表示")
-@discord.app_commands.check(is_owner_check)
-async def list_channels(interaction: discord.Interaction):
-    """監視チャンネル一覧を表示"""
-    embed = discord.Embed(title="監視チャンネル一覧", color=0x00ff00)
-    
-    if not translator_bot.channels:
-        embed.description = "監視チャンネルが設定されていません。"
-    else:
-        for server_id, channel_ids in translator_bot.channels.items():
-            try:
-                guild = bot.get_guild(int(server_id))
-                server_name = guild.name if guild else f"Unknown Server ({server_id})"
-                
-                channel_mentions = []
-                for channel_id in channel_ids:
-                    channel = bot.get_channel(int(channel_id))
-                    if channel:
-                        channel_mentions.append(channel.mention)
-                    else:
-                        channel_mentions.append(f"Unknown Channel ({channel_id})")
-                
-                embed.add_field(
-                    name=server_name,
-                    value="\n".join(channel_mentions) if channel_mentions else "なし",
-                    inline=False
-                )
-            except Exception as e:
-                embed.add_field(name=f"Server {server_id}", value="エラー", inline=False)
-    
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="set_api_key", description="DeepL APIキーを設定")
-@discord.app_commands.check(is_owner_check)
-async def set_api_key(interaction: discord.Interaction, api_key: str):
-    """DeepL APIキーを設定（.envファイルに保存）"""
-    try:
-        # .envファイルに保存
-        translator_bot.update_env_file("DEEPL_API_KEY", api_key)
-        
-        # 環境変数を更新（現在のセッション用）
-        os.environ["DEEPL_API_KEY"] = api_key
-        
-        # 翻訳器を再初期化
-        translator_bot.initialize_translator()
-        
-        if translator_bot.translator:
-            await interaction.response.send_message(
-                "DeepL APIキーを設定し、翻訳器を初期化しました。", 
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                "APIキーの設定に失敗しました。キーを確認してください。", 
-                ephemeral=True
-            )
-    except Exception as e:
-        await interaction.response.send_message(
-            f"APIキーの設定中にエラーが発生しました: {e}", 
-            ephemeral=True
-        )
 
 @bot.tree.command(name="set_languages", description="翻訳言語を設定")
 @discord.app_commands.check(is_owner_check)
