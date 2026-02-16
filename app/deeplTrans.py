@@ -7,6 +7,7 @@ import re
 import json
 import asyncio
 from pathlib import Path
+from app.utils.auth import is_owner_check
 
 # インテントの設定
 intents = discord.Intents.default()

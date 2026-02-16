@@ -10,10 +10,7 @@ from app import deeplTrans
 
 translator_bot = deeplTrans.translator_bot
 
-
-async def is_owner_check(interaction: discord.Interaction) -> bool:
-    """BOTオーナーかどうか確認するヘルパー（コマンドチェック用）"""
-    return await interaction.client.is_owner(interaction.user)
+from app.utils.auth import is_owner_check
 
 
 @bot.tree.command(name="add_channel", description="監視チャンネルを追加")
@@ -340,5 +337,3 @@ async def show_deepl_usage(interaction: discord.Interaction):
     embed = discord.Embed(title="DeepL API 使用量", color=0x0099ff)
     embed.add_field(name="文字数（使用/上限）", value=f"{usage_info['character_count']} / {usage_info['character_limit']}", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
-We need to continue reading further but we've identified commands. The commands module should include imports for os, etc. Ensure to import os in commands module for set_api_key and show_config functions. I did not import os earlier in translate_commands.py — need to add 
