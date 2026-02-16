@@ -96,7 +96,11 @@ class TranslatorBot:
             json.dump(self.channels, f, indent=2, ensure_ascii=False)
     
     def initialize_translator(self):
-        """DeepL翻訳器を初期化"""
+        """DeepL翻訳器を初期化
+
+        - 既存の deepl.Translator を初期化しつつ、TranslationService にも
+          DeepLProvider を登録する（副作用は遅延する）。
+        """
         # 環境変数から最新のAPIキーを取得
         api_key = os.getenv("DEEPL_API_KEY")
         if api_key:
@@ -104,6 +108,19 @@ class TranslatorBot:
                 self.translator = deepl.Translator(api_key)
             except Exception as e:
                 print(f"DeepL初期化エラー: {e}")
+
+        # TranslationService 用の DeepLProvider を作成（初期化は副作用なし）
+        try:
+            from app.translation_service import TranslationService
+            from app.providers.deepl_provider import DeepLProvider
+
+            if api_key:
+                self.translation_service = TranslationService({"deepl": DeepLProvider(api_key=api_key)})
+            else:
+                self.translation_service = None
+        except Exception:
+            # テスト環境等で import に失敗しても既存の動作に影響を与えない
+            self.translation_service = None
     
     def clean_message_content(self, content):
         """メッセージから絵文字や不要な要素を削除"""
@@ -132,7 +149,24 @@ class TranslatorBot:
             return None
     
     async def translate_message(self, message):
-        """メッセージを翻訳"""
+        """メッセージを翻訳
+
+        - 可能であれば TranslationService を経由して翻訳を行う（既存挙動は維持）
+        """
+        # TranslationService が利用可能ならそちらを優先して利用する
+        if getattr(self, "translation_service", None):
+            try:
+                return await self.translation_service.translate_text(
+                    message.content,
+                    source=self.config.get("source_lang", "EN"),
+                    target=self.config.get("target_lang", "JA"),
+                    provider_name="deepl",
+                )
+            except Exception as e:
+                # Provider 側のエラーが発生しても既存の同期的実装へフォールバックする
+                print(f"TranslationService 経由の翻訳でエラーが発生しました: {e}")
+
+        # 既存の実装（フォールバック）
         if not self.translator:
             return None
         
