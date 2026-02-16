@@ -1,0 +1,22 @@
+# ビルドコンテキストから除外するファイル/ディレクトリ
+.git
+.gitignore
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.env
+.env.*
+.DS_Store
+build/
+dist/
+*.egg-info
+pip-wheel-metadata/
+htmlcov/
+node_modules/
+# Compose のオーバーライドは除外
+docker-compose.override.yml

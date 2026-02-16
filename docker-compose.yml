@@ -1,6 +1,20 @@
+version: "3.8"
+
 services:
   disbot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: disbot:latest
     container_name: disbot
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+    # ソースを読み取り専用でマウント（開発時のみ変更してください）
+    volumes:
+      - ./:/app:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
