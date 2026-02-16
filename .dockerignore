@@ -1,4 +1,4 @@
-# ビルドコンテキストから除外するファイル/ディレクトリ
+﻿# ビルドコンテキストから除外するファイル/ディレクトリ
 .git
 .gitignore
 .vscode/
@@ -20,3 +20,10 @@ htmlcov/
 node_modules/
 # Compose のオーバーライドは除外
 docker-compose.override.yml
+
+tests/
+docs/
+wiki/
+.github/
+README.md
+.pytest_cache/
