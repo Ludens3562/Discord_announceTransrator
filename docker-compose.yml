@@ -10,11 +10,11 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Tokyo
-    # 繧ｽ繝ｼ繧ｹ繧定ｪｭ縺ｿ蜿悶ｊ蟆ら畑縺ｧ繝槭え繝ｳ繝茨ｼ磯幕逋ｺ譎ゅ・縺ｿ螟画峩縺励※縺上□縺輔＞・・    volumes:
+    # ソースを読み取り専用でマウント（開発時のみ変更してください）
+    volumes:
       - ./:/app:ro
     healthcheck:
       test: ["CMD-SHELL", "ps -o comm= 1 | grep -q python || exit 1"]
       interval: 1m30s
       timeout: 10s
       retries: 3
-
