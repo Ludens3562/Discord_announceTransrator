@@ -1,2 +1,45 @@
+# Python 関連
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 仮想環境
+.venv/
+venv/
+env/
+ENV/
+
+# エディタ / IDE
+.vscode/
+.idea/
+
+# リポジトリ管理
+.github/
+
+# ログ
+logs/*
+*.log
+
+# テスト / カバレッジ / ビルド
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+.tox/
+
+# 型チェック / キャッシュ
+.mypy_cache/
+.cache/
+
+# 環境ファイル / ローカル設定
 .env
-.github
+.env.local
+.python-version
+
+# OS 固有ファイル
+.DS_Store
+Thumbs.db
