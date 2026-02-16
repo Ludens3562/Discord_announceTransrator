@@ -11,8 +11,9 @@ services:
     environment:
       - TZ=Asia/Tokyo
     # ソースを読み取り専用でマウント（開発時のみ変更してください）
-    volumes:
-      - ./:/app:ro
+    # 注意: アプリは runtime で config.json / channels.json / .env を書き込みます。
+    # ホストのソースを読み取り専用でマウントすると実行時に動作が壊れます。
+    # 開発時にホットリロードが必要なら明示的に override してください。
     healthcheck:
       test: ["CMD-SHELL", "ps -o comm= 1 | grep -q python || exit 1"]
       interval: 1m30s
