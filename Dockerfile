@@ -30,5 +30,5 @@ USER appuser
 # コンテナをデターミニスティックに実行するためのエントリポイント
 ENTRYPOINT ["python", "-u"]
 # モジュールとして実行することでパッケージの相対インポート問題を回避する
-# 例: python -m app.deeplTrans
-CMD ["-m", "app.deeplTrans"]
+# 例: python -m app.main
+CMD ["-m", "app.main"]
