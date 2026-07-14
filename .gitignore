@@ -40,6 +40,9 @@ pip-wheel-metadata/
 .env.local
 .python-version
 
+# Claude Code ローカル設定
+.claude/settings.local.json
+
 # OS 固有ファイル
 .DS_Store
 Thumbs.db
