@@ -1,7 +1,7 @@
 """Provider インターフェースの単体テスト。
 
 - `FakeProvider` を使って `Provider` 抽象クラスの契約（抽象メソッドの要求）を検証する。
-- 既存の翻訳実装（deeplTrans/googleTrans）には影響を与えない簡易テスト。
+- 具体的なプロバイダー実装には依存しない簡易テスト。
 """
 
 import pytest
