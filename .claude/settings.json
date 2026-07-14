@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import discord, asyncpg, deepl, googletrans; print\\('deps OK'\\)\")",
+      "Bash(docker --version)",
+      "Bash(docker info *)"
+    ]
+  }
+}
